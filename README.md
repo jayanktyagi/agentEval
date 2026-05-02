@@ -1,4 +1,6 @@
-# AgentEval 🧪
+<div align="center">
+
+# AgentEval
 
 **The missing test framework for AI agents.**
 
@@ -7,7 +9,9 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green.svg)](https://fastapi.tiangolo.com)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-> *Because guessing whether your agent works is not good enough.*
+<p align="center"><i>Because guessing whether your agent works is not good enough.</i></p>
+
+</div>
 
 ---
 
@@ -188,7 +192,7 @@ MIT © 2026 AgentEval Contributors
 ---
 
 <p align="center">
-  <strong>AgentEval</strong> · <a href="https://twitter.com/agenteval">Twitter</a> · <a href="https://discord.gg/agenteval">Discord</a>
+  <strong>AgentEval</strong> 
   <br/>
   <em>Built by developers who got tired of agents silently failing in production.</em>
 </p>
