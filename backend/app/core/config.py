@@ -11,8 +11,13 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     VERSION: str = "0.1.0"
 
-    # Anthropic — used in Week 2 for scenario generation
+    # Anthropic — swap this in when you get credits
     ANTHROPIC_API_KEY: str = ""
+
+    # Gemini — used for scenario generation
+    GEMINI_API_KEY: str = ""
+
+    GROQ_API_KEY: str = ""
 
     # Database — used in Week 2 when we persist results
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/agenteval"
