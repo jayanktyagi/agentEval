@@ -38,8 +38,8 @@ dev = [
     "mypy>=1.10.0",
 ]
 
-[project.scripts]
-agenteval = "agenteval.cli:main"
+[tool.hatch.build.targets.wheel]
+packages = ["backend/app"]
 
 [tool.ruff]
 line-length = 100
