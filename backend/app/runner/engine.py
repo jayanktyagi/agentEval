@@ -43,6 +43,7 @@ import httpx
 
 from app.core.config import settings
 from app.core.store import store
+from app.runner.generator import generate_scenarios
 from app.models import (
     ExecutionTrace,
     FailureReason,
@@ -298,37 +299,55 @@ async def run_test(run: TestRun) -> None:
     Execute all scenarios for a TestRun.
 
     Called as a FastAPI background task from POST /runs.
-    Updates the run in-place and saves to store after each scenario completes.
+    Saves to both in-memory store (for fast reads during the run)
+    and Postgres (for persistence across restarts).
     """
+    from app.db.database import SessionLocal
+    from app.db.repository import save_run, save_result
+
     logger.info("Starting test run %s for agent: %s", run.run_id, run.test.agent_endpoint)
 
-    scenarios = generate_stub_scenarios(run)
+    scenarios = await generate_scenarios(
+        task_description=run.test.task_description,
+        expected_tools=run.test.expected_tools,
+        max_steps=run.test.max_steps,
+    )
     run.scenarios = scenarios
     results = []
 
-    for scenario in scenarios:
-        logger.info("Running scenario: %s", scenario.title)
+    async with SessionLocal() as session:
+        # Save the run immediately so it appears in the DB as "running"
+        await save_run(session, run)
 
-        raw = await call_agent(
-            endpoint=run.test.agent_endpoint,
-            task=scenario.task_prompt,
-            timeout=run.test.timeout_seconds,
-        )
+        for scenario in scenarios:
+            logger.info("Running scenario: %s", scenario.title)
 
-        trace = parse_trace(raw, scenario.task_prompt) if raw else empty_trace(scenario.task_prompt)
-        result = evaluate(scenario, trace)
-        results.append(result)
+            raw = await call_agent(
+                endpoint=run.test.agent_endpoint,
+                task=scenario.task_prompt,
+                timeout=run.test.timeout_seconds,
+            )
 
-        # Persist after each scenario so partial results are always readable
+            trace = parse_trace(raw, scenario.task_prompt) if raw else empty_trace(scenario.task_prompt)
+            result = evaluate(scenario, trace)
+            results.append(result)
+
+            # Save result to Postgres
+            await save_result(session, run.run_id, result)
+
+            # Update in-memory store so polling GET /runs/{id} sees progress
+            run.results = results
+            store.save(run)
+
+            # Small delay between scenarios — be polite to the agent under test
+            await asyncio.sleep(0.5)
+
         run.results = results
+        run.compute_metrics()
+
+        # Final save to both stores
+        await save_run(session, run)
         store.save(run)
-
-        # Small delay between scenarios — be polite to the agent under test
-        await asyncio.sleep(0.5)
-
-    run.results = results
-    run.compute_metrics()
-    store.save(run)
 
     logger.info(
         "Test run %s complete — %d/%d passed (%.0f%%)",

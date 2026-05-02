@@ -11,11 +11,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router
 from app.core.config import settings
+from app.db.database import create_tables
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print(f"AgentEval API starting — version {settings.VERSION}")
+    await create_tables()
+    print("Database tables ready")
     yield
     print("AgentEval API shutting down")
 
