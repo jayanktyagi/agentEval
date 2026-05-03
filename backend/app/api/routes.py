@@ -3,21 +3,22 @@ backend/app/api/routes.py
 
 All HTTP endpoints for AgentEval.
 
-POST /runs          — submit an AgentTest, kick off a test run
-GET  /runs          — list all runs
-GET  /runs/{run_id} — get a single run with full results
+POST /runs          — submit an AgentTest, enqueue the run, return 202
+GET  /runs          — list all runs from Postgres
+GET  /runs/{run_id} — get a single run (memory first, then Postgres)
+GET  /health        — queue and database health check
 """
 
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.store import store
 from app.db.database import get_session
-from app.db.repository import get_run, list_runs
+from app.db.repository import get_run, list_runs, save_run
 from app.models import AgentTest, TestRun, TestStatus
-from app.runner.engine import run_test
+from app.core.queue import enqueue_run, get_redis
 
 router = APIRouter()
 
@@ -25,29 +26,31 @@ router = APIRouter()
 @router.post("/runs", response_model=TestRun, status_code=202)
 async def create_run(
     test: AgentTest,
-    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
 ):
     """
-    Submit an AgentTest configuration and start a test run.
+    Submit an AgentTest and enqueue it for execution.
 
-    Returns immediately with a TestRun in RUNNING status.
+    Returns immediately with status=running.
     Poll GET /runs/{run_id} to check progress.
     """
     run = TestRun(test=test, status=TestStatus.RUNNING)
 
-    # Keep in memory for fast access during the run
+    # Save to memory so the worker can find it
     store.save(run)
 
-    # Run the test in the background
-    background_tasks.add_task(run_test, run)
+    # Save to Postgres immediately so it shows up in list even before completion
+    await save_run(session, run)
+
+    # Push onto Redis queue — worker picks this up
+    enqueue_run(str(run.run_id))
 
     return run
 
 
 @router.get("/runs", response_model=list[TestRun])
 async def list_all_runs(session: AsyncSession = Depends(get_session)):
-    """Return all test runs from the database, most recent first."""
+    """Return all test runs from Postgres, most recent first."""
     return await list_runs(session)
 
 
@@ -59,17 +62,36 @@ async def get_single_run(
     """
     Get a single test run by ID.
 
-    Checks in-memory store first (for runs still in progress),
-    then falls back to the database (for completed runs).
+    Checks memory first (fast, for runs in progress),
+    then falls back to Postgres (for completed runs).
     """
-    # Check memory first — run might still be in progress
     run = store.get(run_id)
     if run:
         return run
 
-    # Fall back to database
     run = await get_run(session, run_id)
     if not run:
         raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
 
     return run
+
+
+@router.get("/queue/health")
+async def queue_health():
+    """Check Redis queue health — useful for monitoring."""
+    try:
+        redis = get_redis()
+        redis.ping()
+        from rq import Queue
+        q = Queue("agenteval", connection=redis)
+        return {
+            "status": "ok",
+            "queued_jobs": len(q),
+            "redis": "connected",
+        }
+    except Exception as exc:
+        return {
+            "status": "error",
+            "error": str(exc),
+            "redis": "disconnected",
+        }
