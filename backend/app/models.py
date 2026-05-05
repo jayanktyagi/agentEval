@@ -5,12 +5,12 @@ Core data structures for AgentEval.
 This is the schema everything else is built around.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # ---------------------------------------------------------------------------
@@ -50,10 +50,9 @@ class ToolCall(BaseModel):
     response: Any = Field(default=None, description="What the tool returned")
     status: StepStatus = Field(default=StepStatus.SUCCESS)
     duration_ms: int = Field(default=0, description="How long this tool call took in milliseconds")
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 # ---------------------------------------------------------------------------
@@ -72,7 +71,7 @@ class ExecutionTrace(BaseModel):
     loop_at_step: int | None = Field(default=None, description="Step where loop was first detected")
     final_output: str | None = Field(default=None, description="Agent's final response text")
     total_duration_ms: int = Field(default=0)
-    started_at: datetime = Field(default_factory=datetime.utcnow)
+    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     finished_at: datetime | None = Field(default=None)
 
     def tool_sequence(self) -> list[str]:
@@ -96,8 +95,7 @@ class TestScenario(BaseModel):
     expected_max_steps: int = Field(..., description="Maximum steps before we consider it a failure")
     should_complete: bool = Field(default=True, description="Should the agent signal task completion?")
 
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 # ---------------------------------------------------------------------------
@@ -137,8 +135,7 @@ class ScenarioResult(BaseModel):
         description="Ratio of expected steps to actual steps. 1.0 = perfect, <1.0 = used more steps"
     )
 
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
     def passed(self) -> bool:
         return self.status == TestStatus.PASSED
@@ -186,7 +183,7 @@ class AgentTest(BaseModel):
         description="Max seconds to wait for agent response per step"
     )
     tags: list[str] = Field(default_factory=list, description="Optional tags for filtering/grouping")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # ---------------------------------------------------------------------------
@@ -201,7 +198,7 @@ class TestRun(BaseModel):
     scenarios: list[TestScenario] = Field(default_factory=list)
     results: list[ScenarioResult] = Field(default_factory=list)
     status: TestStatus = Field(default=TestStatus.RUNNING)
-    started_at: datetime = Field(default_factory=datetime.utcnow)
+    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     finished_at: datetime | None = Field(default=None)
 
     # Aggregate metrics — computed after all scenarios run
@@ -210,8 +207,7 @@ class TestRun(BaseModel):
     failed: int = Field(default=0)
     pass_rate: float = Field(default=0.0, description="Fraction of scenarios that passed (0.0–1.0)")
 
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
     def compute_metrics(self) -> None:
         """Recompute aggregate metrics from results. Call after all scenarios finish."""

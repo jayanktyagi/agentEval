@@ -1,13 +1,13 @@
 """
 tests/test_generator.py
 
-Tests for the Gemini scenario generator.
+Tests for the Groq scenario generator.
 
 Uses mocking so these run without a real API key.
 """
 
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -15,7 +15,7 @@ from app.models import ScenarioType
 from app.runner.generator import fallback_scenarios, parse_scenarios
 
 
-VALID_GEMINI_RESPONSE = json.dumps([
+VALID_GROQ_RESPONSE = json.dumps([
     {
         "scenario_type": "happy_path",
         "title": "Happy path: successful flight booking",
@@ -48,18 +48,18 @@ VALID_GEMINI_RESPONSE = json.dumps([
 
 class TestParseScenarios:
     def test_parses_valid_response(self):
-        scenarios = parse_scenarios(VALID_GEMINI_RESPONSE, ["search_flights"], 10)
+        scenarios = parse_scenarios(VALID_GROQ_RESPONSE, ["search_flights"], 10)
         assert len(scenarios) == 3
 
     def test_correct_types(self):
-        scenarios = parse_scenarios(VALID_GEMINI_RESPONSE, [], 10)
+        scenarios = parse_scenarios(VALID_GROQ_RESPONSE, [], 10)
         types = [s.scenario_type for s in scenarios]
         assert ScenarioType.HAPPY_PATH in types
         assert ScenarioType.FAILURE_CASE in types
         assert ScenarioType.EDGE_CASE in types
 
     def test_strips_markdown_fences(self):
-        fenced = f"```json\n{VALID_GEMINI_RESPONSE}\n```"
+        fenced = f"```json\n{VALID_GROQ_RESPONSE}\n```"
         scenarios = parse_scenarios(fenced, [], 10)
         assert len(scenarios) == 3
 
@@ -114,23 +114,26 @@ class TestGenerateScenarios:
     @pytest.mark.asyncio
     async def test_falls_back_when_no_api_key(self):
         with patch("app.runner.generator.settings") as mock_settings:
-            mock_settings.GEMINI_API_KEY = ""
+            mock_settings.GROQ_API_KEY = ""
             from app.runner.generator import generate_scenarios
             result = await generate_scenarios("Book a flight", ["search_flights"], 10)
         assert len(result) >= 1
 
     @pytest.mark.asyncio
-    async def test_uses_gemini_when_key_present(self):
-        mock_response = MagicMock()
-        mock_response.text = VALID_GEMINI_RESPONSE
+    async def test_uses_groq_when_key_present(self):
+        mock_choice = MagicMock()
+        mock_choice.message.content = VALID_GROQ_RESPONSE
 
-        mock_model = MagicMock()
-        mock_model.generate_content.return_value = mock_response
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = mock_response
 
         with patch("app.runner.generator.settings") as mock_settings, \
-             patch("app.runner.generator.genai") as mock_genai:
-            mock_settings.GEMINI_API_KEY = "fake-key-for-testing"
-            mock_genai.GenerativeModel.return_value = mock_model
+             patch("app.runner.generator.Groq") as mock_groq:
+            mock_settings.GROQ_API_KEY = "fake-key-for-testing"
+            mock_groq.return_value = mock_client
 
             from app.runner.generator import generate_scenarios
             result = await generate_scenarios("Book a flight", ["search_flights"], 10)
@@ -140,9 +143,9 @@ class TestGenerateScenarios:
     @pytest.mark.asyncio
     async def test_falls_back_on_api_error(self):
         with patch("app.runner.generator.settings") as mock_settings, \
-             patch("app.runner.generator.genai") as mock_genai:
-            mock_settings.GEMINI_API_KEY = "fake-key"
-            mock_genai.GenerativeModel.side_effect = Exception("API error")
+             patch("app.runner.generator.Groq") as mock_groq:
+            mock_settings.GROQ_API_KEY = "fake-key"
+            mock_groq.side_effect = Exception("API error")
 
             from app.runner.generator import generate_scenarios
             result = await generate_scenarios("Book a flight", ["search_flights"], 10)

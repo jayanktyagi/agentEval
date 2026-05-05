@@ -33,155 +33,166 @@ AgentEval fixes this.
 
 ## What AgentEval Does
 
-AgentEval is an **open-source agent testing platform** that tests the full behavioral reliability of your agent — not just its output quality.
-
 | What existing tools test | What AgentEval tests |
 |---|---|
-| ✅ Was the LLM response accurate? | ✅ Was the **right tool** called? |
-| ✅ Was the output well-formatted? | ✅ Were steps executed in the **correct sequence**? |
-| ❌ Did the agent loop? | ✅ Did the agent **recover from failures**? |
-| ❌ Did it call the wrong tool? | ✅ Did it complete within the **expected step count**? |
-| ❌ What broke after re-deployment? | ✅ What **regressed** after your last deploy? |
+| Was the LLM response accurate? | Was the **right tool** called? |
+| Was the output well-formatted? | Were steps executed in the **correct sequence**? |
+| — | Did the agent **recover from failures**? |
+| — | Did it complete within the **expected step count**? |
+| — | What **regressed** after your last deploy? |
 
 ---
 
 ## Quick Start
 
+**1. Clone and install:**
 ```bash
-pip install agenteval
+git clone https://github.com/yourusername/agenteval
+cd agenteval
+pip install -r requirements.txt
 ```
 
-```python
-from agenteval import AgentEval
-
-eval = AgentEval(
-    agent_endpoint="http://localhost:8000/run",
-    task="Book a flight from Karachi to Dubai for next Friday",
-    expected_tools=["search_flights", "check_availability", "book_ticket"],
-    max_steps=10
-)
-
-results = eval.run()
-results.summary()
+**2. Set up environment:**
+```bash
+cp .env.example .env
+# Add your GROQ_API_KEY — free at console.groq.com
 ```
 
-```
-✅ Passed: 7/10 scenarios
-❌ Failed: 3/10 scenarios
-
-Failure breakdown:
-  - Scenario 4: Called 'search_hotels' before 'check_availability' (wrong order)
-  - Scenario 7: Loop detected at step 6 — agent called 'search_flights' 3x with same params
-  - Scenario 9: Task abandoned at step 4 — no recovery after API timeout
+**3. Start infrastructure:**
+```bash
+docker compose up -d db redis
 ```
 
----
+**4. Start the API and worker:**
+```bash
+# Terminal 1
+uvicorn backend.app.main:app --reload --port 8000
 
-## Core Features
-
-### 🧠 Automatic Test Scenario Generation
-Describe your agent — AgentEval uses an LLM to generate 10 test scenarios automatically: 3 happy paths, 4 failure cases, 3 edge cases. No manual test writing.
-
-### 🔍 Full Execution Tracing
-Every test run captures a complete trace:
-- Which tool was called at each step
-- What parameters were passed
-- What was returned
-- Where loops occurred
-- Whether the agent recovered or gave up
-
-### 📊 Pass/Fail Reporting
-Clear, structured results — not just logs:
-- Expected vs actual tool call sequence
-- Task completion rate
-- Failure point identification
-- Step count analysis
-
-### 🔄 GitHub Actions Integration
-```yaml
-- name: Run AgentEval
-  uses: agenteval/action@v1
-  with:
-    agent_endpoint: ${{ secrets.AGENT_ENDPOINT }}
-    config: agenteval.yml
+# Terminal 2
+cd backend && python -m app.worker
 ```
 
-Run regression tests automatically on every deployment.
-
----
-
-## How It Works
-
+**5. Run your first test:**
+```bash
+curl -X POST http://localhost:8000/api/v1/runs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My Flight Agent",
+    "agent_endpoint": "http://localhost:9000/run",
+    "task_description": "Book a flight from Karachi to Dubai",
+    "expected_tools": ["search_flights", "check_availability", "book_ticket"],
+    "max_steps": 10
+  }'
 ```
-Developer defines agent → AgentEval generates test scenarios (via LLM)
-       ↓
-Each scenario sends a real task to your agent's HTTP endpoint
-       ↓
-AgentEval records the full execution trace (tools, params, steps, loops)
-       ↓
-Pass/Fail report + dashboard visualization
+
+**6. Check results:**
+```bash
+curl http://localhost:8000/api/v1/runs/{run_id}
 ```
 
 ---
 
-## Architecture
+## Testing with the Mock Agent
+
+No agent yet? Use the built-in mock agent to try AgentEval end-to-end:
+
+```bash
+# Terminal 3
+python mock_agent/server.py
+
+# Terminal 4
+python scripts/e2e_test.py
+```
+
+The mock agent simulates 4 behaviors — happy path, loop, wrong order, and failure — triggered by keywords in the task prompt.
+
+---
+
+## Windows Setup
+
+If you have Postgres installed locally, Docker's Postgres may conflict on port 5432. The `docker-compose.yml` uses port `5433` to avoid this. Make sure your `.env` has:
+
+```bash
+DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5433/agenteval
+```
+
+---
+
+## Project Structure
 
 ```
 agenteval/
-├── backend/          # FastAPI — test runner + execution engine
-│   ├── runner/       # Sends tasks, records traces
-│   ├── evaluator/    # Pass/fail logic, loop detection
-│   └── generator/    # LLM-based scenario generation
-├── sandbox/          # Docker — isolated agent execution
-├── dashboard/        # Next.js — results UI
-└── integrations/     # GitHub Actions, CI/CD
+├── backend/
+│   └── app/
+│       ├── main.py          # FastAPI entry point
+│       ├── models.py        # Core data structures
+│       ├── worker.py        # RQ worker process
+│       ├── api/
+│       │   └── routes.py    # HTTP endpoints
+│       ├── core/
+│       │   ├── config.py    # Settings
+│       │   ├── store.py     # In-memory store
+│       │   └── queue.py     # Redis queue
+│       ├── db/
+│       │   ├── database.py  # SQLAlchemy setup
+│       │   ├── orm.py       # Table definitions
+│       │   └── repository.py# DB read/write
+│       └── runner/
+│           ├── engine.py    # Test execution engine
+│           └── generator.py # LLM scenario generation
+├── mock_agent/
+│   └── server.py            # Fake agent for local testing
+├── scripts/
+│   └── e2e_test.py          # End-to-end test script
+├── tests/                   # Unit tests (21 passing)
+├── .github/
+│   └── workflows/
+│       └── ci.yml           # GitHub Actions CI
+├── docker-compose.yml
+├── requirements.txt
+└── .env.example
 ```
 
-**Tech stack:** Python + FastAPI · Docker · PostgreSQL · Redis · Next.js · Claude API
+---
+
+## Running Tests
+
+```bash
+cd backend
+pytest ../tests/ -v
+```
+
+21 tests, all passing, no external dependencies needed.
 
 ---
 
 ## Roadmap
 
 - [x] HTTP endpoint agent connection
-- [x] Automatic test scenario generation
-- [x] Execution trace recording
-- [x] Pass/fail reporting + dashboard
-- [x] GitHub Actions integration
+- [x] Automatic test scenario generation via LLM
+- [x] Full execution trace recording
+- [x] Pass/fail reporting with exact failure points
+- [x] Loop detection
+- [x] Postgres persistence
+- [x] Redis job queue
+- [x] GitHub Actions CI
+- [ ] Results dashboard (Next.js) — in progress
+- [ ] GitHub Actions integration for agent repos
 - [ ] Voice agent support
-- [ ] Team collaboration features
-- [ ] Cloud-hosted version (AgentEval Cloud)
-- [ ] Support for browser-use agents
-- [ ] Playwright-based web action tracing
+- [ ] Cloud-hosted version
 
 ---
 
 ## Contributing
 
-AgentEval is MIT licensed and community-driven.
+MIT licensed. PRs welcome.
 
 ```bash
 git clone https://github.com/yourusername/agenteval
 cd agenteval
-pip install -e ".[dev]"
+pip install -r requirements-dev.txt
+cd backend && pytest ../tests/ -v
 ```
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
----
-
-## Why Open Source?
-
-Agent testing should be a community standard — not a paid feature.
-
-We're following the DeepEval/Confident AI playbook: give developers real value first, build the cloud platform later. The core will always be free.
-
----
-
-## Star History
-
-If AgentEval saves you even one production incident, **please star this repo** ⭐  
-It helps other developers discover it.
 
 ---
 
@@ -192,7 +203,7 @@ MIT © 2026 AgentEval Contributors
 ---
 
 <p align="center">
-  <strong>AgentEval</strong> 
+  <strong>AgentEval</strong> · <a href="https://twitter.com/agenteval">Twitter</a> · <a href="https://discord.gg/agenteval">Discord</a>
   <br/>
   <em>Built by developers who got tired of agents silently failing in production.</em>
 </p>
