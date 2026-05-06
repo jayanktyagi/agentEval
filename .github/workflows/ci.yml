@@ -29,9 +29,7 @@ jobs:
           GROQ_API_KEY: ""
           DATABASE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5432/agenteval"
           REDIS_URL: "redis://localhost:6379"
-        run: |
-          cd backend
-          pytest ../tests/ -v --tb=short
+        run: pytest tests/ -v --tb=short
 
   lint:
     name: Lint
