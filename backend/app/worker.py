@@ -3,22 +3,9 @@ backend/app/worker.py
 
 The RQ worker entry point.
 
-This file does two things:
-1. Defines execute_run() — the function RQ calls for each job
-2. Provides a __main__ block to start the worker process
-
-Start the worker with:
-    python -m app.worker
-
-Or with the rq CLI:
-    rq worker agenteval --url redis://localhost:6379
-
-How it works:
-- POST /runs enqueues a job with the run_id
-- The worker picks up the job from Redis
-- Calls execute_run(run_id)
-- execute_run fetches the run from the in-memory store
-- Runs all scenarios and saves results to Postgres
+Fetches the TestRun from Postgres (not in-memory store)
+because the worker runs in a separate process and cannot
+access the API server's memory.
 """
 
 import asyncio
@@ -26,12 +13,7 @@ import logging
 import sys
 import os
 
-# Make sure backend/ is on the path when running as a module
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from app.core.store import store
-from app.models import TestStatus
-from rq import SimpleWorker
 
 logger = logging.getLogger(__name__)
 
@@ -40,57 +22,59 @@ def execute_run(run_id: str) -> dict:
     """
     Execute a test run. Called by the RQ worker for each job.
 
-    RQ calls this function in a separate process, so we need to:
-    1. Get the run from the in-memory store (passed via run_id)
-    2. Run the async engine synchronously using asyncio.run()
-    3. Return a summary dict (stored as the job result in Redis)
-
-    Args:
-        run_id: String UUID of the TestRun to execute
-
-    Returns:
-        dict with pass_rate and status for quick inspection
+    Fetches the run from Postgres, runs all scenarios,
+    saves results back to Postgres.
     """
     from uuid import UUID
     from app.runner.engine import run_test
+    from app.models import TestRun, TestStatus
 
     logger.info("Worker picked up run %s", run_id)
 
-    run = store.get(UUID(run_id))
-    if not run:
-        logger.error("Run %s not found in store", run_id)
-        return {"error": f"Run {run_id} not found"}
+    async def _execute():
+        from app.db.database import SessionLocal, create_tables
+        from app.db.repository import get_run, save_run
 
-    try:
-        # RQ workers are sync — run the async engine with asyncio.run()
-        asyncio.run(run_test(run))
+        await create_tables()
 
-        logger.info(
-            "Worker completed run %s — %d/%d passed",
-            run_id,
-            run.passed,
-            run.total_scenarios,
-        )
+        async with SessionLocal() as session:
+            run = await get_run(session, UUID(run_id))
 
-        return {
-            "run_id": run_id,
-            "status": run.status,
-            "passed": run.passed,
-            "total": run.total_scenarios,
-            "pass_rate": run.pass_rate,
-        }
+        if not run:
+            logger.error("Run %s not found in Postgres", run_id)
+            return {"error": f"Run {run_id} not found"}
 
-    except Exception as exc:
-        logger.error("Worker failed on run %s: %s", run_id, exc)
-        run.status = TestStatus.ERROR
+        # Also put it in the in-memory store so routes can read it
+        from app.core.store import store
         store.save(run)
-        return {"run_id": run_id, "error": str(exc)}
+
+        try:
+            await run_test(run)
+            logger.info(
+                "Worker completed run %s — %d/%d passed",
+                run_id, run.passed, run.total_scenarios,
+            )
+            return {
+                "run_id": run_id,
+                "status": run.status,
+                "passed": run.passed,
+                "total": run.total_scenarios,
+                "pass_rate": run.pass_rate,
+            }
+        except Exception as exc:
+            logger.error("Worker failed on run %s: %s", run_id, exc)
+            run.status = TestStatus.ERROR
+            async with SessionLocal() as session:
+                from app.db.repository import save_run
+                await save_run(session, run)
+            return {"run_id": run_id, "error": str(exc)}
+
+    return asyncio.run(_execute())
 
 
 if __name__ == "__main__":
     from redis import Redis
-    from rq import Worker
-
+    from rq import SimpleWorker
     from app.core.config import settings
 
     logging.basicConfig(
@@ -101,6 +85,6 @@ if __name__ == "__main__":
     redis_conn = Redis.from_url(settings.REDIS_URL)
     worker = SimpleWorker(["agenteval"], connection=redis_conn)
 
-    print(f"AgentEval worker starting — listening on queue 'agenteval'")
+    print("AgentEval worker starting — listening on queue 'agenteval'")
     print(f"Redis: {settings.REDIS_URL}")
     worker.work(with_scheduler=False)

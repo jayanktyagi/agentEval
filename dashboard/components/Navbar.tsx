@@ -6,7 +6,7 @@ export default function Navbar() {
     <nav style={{
       borderBottom: "1px solid var(--border)",
       padding: "0 24px",
-      height: "48px",
+      height: "44px",
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
@@ -19,44 +19,42 @@ export default function Navbar() {
         textDecoration: "none",
         display: "flex",
         alignItems: "center",
-        gap: "10px",
+        gap: "12px",
       }}>
         <span style={{
-          color: "var(--green)",
-          fontSize: "15px",
+          color: "var(--text)",
+          fontSize: "13px",
           fontWeight: 700,
-          letterSpacing: "-0.02em",
+          letterSpacing: "0.05em",
         }}>
-          agent<span style={{ color: "var(--text)" }}>eval</span>
+          AGENTEVAL
         </span>
         <span style={{
           fontSize: "10px",
           color: "var(--text-3)",
           letterSpacing: "0.1em",
-          borderLeft: "1px solid var(--border)",
-          paddingLeft: "10px",
         }}>
           v0.1.0
         </span>
       </Link>
 
-      <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
         <Link href="/" style={{
-          color: "var(--text-2)",
+          color: "var(--text-3)",
           textDecoration: "none",
-          fontSize: "12px",
+          fontSize: "11px",
           letterSpacing: "0.05em",
         }}>
           runs
         </Link>
         <Link href="/new" style={{
           color: "var(--bg)",
-          background: "var(--green)",
+          background: "var(--text)",
           textDecoration: "none",
           fontSize: "11px",
           fontWeight: 600,
           letterSpacing: "0.05em",
-          padding: "5px 12px",
+          padding: "4px 12px",
           borderRadius: "2px",
         }}>
           + new run

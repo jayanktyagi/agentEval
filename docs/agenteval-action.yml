@@ -1,0 +1,75 @@
+# AgentEval CI Integration
+# Add this file to your agent repo at: .github/workflows/agenteval.yml
+#
+# This runs AgentEval against your agent on every push,
+# so you know immediately if a deployment broke something.
+#
+# Required secrets (set in your repo Settings → Secrets):
+#   AGENT_ENDPOINT  — your agent's HTTP endpoint
+#   GROQ_API_KEY    — free at console.groq.com
+#
+# Required variables (set in agenteval.yml or as secrets):
+#   TASK_DESCRIPTION   — what your agent does in plain English
+#   EXPECTED_TOOLS     — comma separated list of tool names
+#   MAX_STEPS          — maximum steps per scenario (default: 10)
+
+name: AgentEval
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-agent:
+    name: Test agent behavior
+    runs-on: ubuntu-latest
+
+    services:
+      agenteval-db:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: agenteval
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+      agenteval-redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install AgentEval
+        run: pip install agenteval
+
+      - name: Run agent tests
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/agenteval
+          REDIS_URL: redis://localhost:6379
+        run: |
+          agenteval run \
+            --name "CI Run - ${{ github.sha }}" \
+            --endpoint "${{ secrets.AGENT_ENDPOINT }}" \
+            --task "${{ vars.TASK_DESCRIPTION }}" \
+            --tools "${{ vars.EXPECTED_TOOLS }}" \
+            --max-steps "${{ vars.MAX_STEPS || 10 }}" \
+            --fail-under 0.7

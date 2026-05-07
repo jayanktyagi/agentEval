@@ -1,4 +1,3 @@
-// app/new/page.tsx — submit a new test run
 "use client";
 
 import { useState } from "react";
@@ -24,10 +23,8 @@ export default function NewRunPage() {
       setError("all fields are required");
       return;
     }
-
     setLoading(true);
     setError(null);
-
     try {
       const run = await submitRun({
         name: form.name,
@@ -38,24 +35,24 @@ export default function NewRunPage() {
       });
       router.push(`/runs/${run.run_id}`);
     } catch {
-      setError("failed to submit run — is the backend running?");
+      setError("failed to submit — is the backend running on port 8000?");
       setLoading(false);
     }
   };
 
-  const inputStyle = {
+  const inputStyle: React.CSSProperties = {
     width: "100%",
     background: "var(--bg-2)",
-    border: "1px solid var(--border)",
+    border: "1px solid var(--border-2)",
     borderRadius: "2px",
-    padding: "10px 14px",
+    padding: "9px 12px",
     color: "var(--text)",
     fontFamily: "inherit",
     fontSize: "13px",
     outline: "none",
   };
 
-  const labelStyle = {
+  const labelStyle: React.CSSProperties = {
     display: "block",
     color: "var(--text-3)",
     fontSize: "10px",
@@ -66,18 +63,22 @@ export default function NewRunPage() {
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg)" }}>
       <Navbar />
-      <div style={{ padding: "32px 24px", maxWidth: "600px", margin: "0 auto" }}>
+      <div style={{ padding: "32px 24px", maxWidth: "560px", margin: "0 auto" }}>
 
-        <div style={{ marginBottom: "32px" }}>
-          <div style={{ color: "var(--text-3)", fontSize: "11px", letterSpacing: "0.1em", marginBottom: "6px" }}>
+        <div style={{
+          marginBottom: "28px",
+          paddingBottom: "16px",
+          borderBottom: "1px solid var(--border)",
+        }}>
+          <div style={{ color: "var(--text-3)", fontSize: "10px", letterSpacing: "0.1em", marginBottom: "6px" }}>
             NEW RUN
           </div>
-          <div style={{ fontSize: "22px", fontWeight: 600, letterSpacing: "-0.02em" }}>
+          <div style={{ fontSize: "18px", fontWeight: 600 }}>
             submit agent test
           </div>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
           <div>
             <label style={labelStyle}>RUN NAME</label>
             <input
@@ -121,7 +122,7 @@ export default function NewRunPage() {
           <div>
             <label style={labelStyle}>MAX STEPS</label>
             <input
-              style={{ ...inputStyle, width: "120px" }}
+              style={{ ...inputStyle, width: "100px" }}
               type="number"
               min="1"
               max="100"
@@ -132,27 +133,27 @@ export default function NewRunPage() {
 
           {error && (
             <div style={{
-              color: "var(--red)",
+              color: "var(--fail)",
               fontSize: "12px",
-              padding: "10px 14px",
-              border: "1px solid var(--red)33",
-              background: "var(--red)11",
+              padding: "9px 12px",
+              border: "1px solid var(--fail)33",
+              background: "#ef444408",
               borderRadius: "2px",
             }}>
               {error}
             </div>
           )}
 
-          <div style={{ display: "flex", gap: "12px", paddingTop: "8px" }}>
+          <div style={{ display: "flex", gap: "10px", paddingTop: "6px" }}>
             <button
               onClick={handleSubmit}
               disabled={loading}
               style={{
-                background: loading ? "var(--border)" : "var(--green)",
-                color: loading ? "var(--text-3)" : "var(--bg)",
+                background: loading ? "var(--border-2)" : "var(--text)",
+                color: "var(--bg)",
                 border: "none",
                 borderRadius: "2px",
-                padding: "10px 24px",
+                padding: "9px 20px",
                 fontFamily: "inherit",
                 fontSize: "12px",
                 fontWeight: 600,
@@ -168,9 +169,9 @@ export default function NewRunPage() {
               style={{
                 background: "transparent",
                 color: "var(--text-3)",
-                border: "1px solid var(--border)",
+                border: "1px solid var(--border-2)",
                 borderRadius: "2px",
-                padding: "10px 24px",
+                padding: "9px 20px",
                 fontFamily: "inherit",
                 fontSize: "12px",
                 cursor: "pointer",
