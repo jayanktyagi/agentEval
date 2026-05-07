@@ -203,7 +203,7 @@ MIT © 2026 AgentEval Contributors
 ---
 
 <p align="center">
-  <strong>AgentEval</strong> · <a href="https://twitter.com/agenteval">Twitter</a> · <a href="https://discord.gg/agenteval">Discord</a>
+  <strong>AgentEval</strong>
   <br/>
   <em>Built by developers who got tired of agents silently failing in production.</em>
 </p>
