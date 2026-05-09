@@ -24,8 +24,7 @@ def execute_run(run_id: str) -> dict:
         from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
         from app.core.config import settings
         from app.core.store import store
-        from app.models import TestStatus
-        from app.db.repository import get_run, save_run
+        from app.db.repository import get_run
         from app.runner.engine import run_test
 
         # Create fresh engine bound to THIS event loop

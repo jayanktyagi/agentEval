@@ -12,14 +12,13 @@ This is the only file that changes if we ever switch databases.
 import json
 import logging
 import uuid
-from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db.orm import ScenarioResultORM, TestRunORM
-from app.models import ScenarioResult, TestRun, TestStatus
+from app.models import ScenarioResult, TestRun
 
 logger = logging.getLogger(__name__)
 
