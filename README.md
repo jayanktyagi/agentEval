@@ -210,11 +210,7 @@ MIT © 2026 AgentEval Contributors
 ---
 
 <p align="center">
-<<<<<<< HEAD
-  <strong>AgentEval</strong>
-=======
   <strong>AgentEval</strong> 
->>>>>>> 19f6934 (feat: MVP complete — worker fix, dashboard working end-to-end, README updated)
   <br/>
   <em>Built by developers who got tired of agents silently failing in production.</em>
 </p>
