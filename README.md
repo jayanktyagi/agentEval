@@ -2,6 +2,8 @@
 
 # AgentEval
 
+![Demo](docs/demo.gif)
+
 **The missing test framework for AI agents.**
 
 [![CI](https://github.com/Fizza-Mukhtar/agentEval/actions/workflows/ci.yml/badge.svg)](https://github.com/Fizza-Mukhtar/agentEval/actions)
