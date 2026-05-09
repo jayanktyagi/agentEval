@@ -2,8 +2,6 @@
 
 # AgentEval
 
-![Demo](docs/demo.gif)
-
 **The missing test framework for AI agents.**
 
 [![CI](https://github.com/Fizza-Mukhtar/agentEval/actions/workflows/ci.yml/badge.svg)](https://github.com/Fizza-Mukhtar/agentEval/actions)
@@ -11,6 +9,8 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
 <p align="center"><i>Because guessing whether your agent works is not good enough.</i></p>
+
+![Demo](docs/demo.gif)
 
 </div>
 
