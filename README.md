@@ -4,10 +4,9 @@
 
 **The missing test framework for AI agents.**
 
+[![CI](https://github.com/Fizza-Mukhtar/agentEval/actions/workflows/ci.yml/badge.svg)](https://github.com/Fizza-Mukhtar/agentEval/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green.svg)](https://fastapi.tiangolo.com)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 <p align="center"><i>Because guessing whether your agent works is not good enough.</i></p>
 
@@ -47,7 +46,7 @@ AgentEval fixes this.
 
 **1. Clone and install:**
 ```bash
-git clone https://github.com/yourusername/agenteval
+git clone https://github.com/Fizza-Mukhtar/agentEval
 cd agenteval
 pip install -r requirements.txt
 ```
@@ -98,7 +97,7 @@ No agent yet? Use the built-in mock agent to try AgentEval end-to-end:
 
 ```bash
 # Terminal 3
-python mock_agent/server.py
+python mock_agent/server.py  # runs on port 9001
 
 # Terminal 4
 python scripts/e2e_test.py
@@ -110,11 +109,19 @@ The mock agent simulates 4 behaviors — happy path, loop, wrong order, and fail
 
 ## Windows Setup
 
-If you have Postgres installed locally, Docker's Postgres may conflict on port 5432. The `docker-compose.yml` uses port `5433` to avoid this. Make sure your `.env` has:
+**Postgres port conflict:** If you have Postgres installed locally, Docker's Postgres conflicts on port 5432. The `docker-compose.yml` uses port `5433`. Make sure your `.env` has:
 
 ```bash
 DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5433/agenteval
 ```
+
+**ClickHouse port conflict:** If you have ClickHouse installed, it occupies port 9000. The mock agent runs on port `9001` instead:
+
+```bash
+python mock_agent/server.py  # listens on port 9001
+```
+
+Use `http://localhost:9001/run` as the agent endpoint when testing locally on Windows.
 
 ---
 
@@ -188,7 +195,7 @@ pytest ../tests/ -v
 MIT licensed. PRs welcome.
 
 ```bash
-git clone https://github.com/yourusername/agenteval
+git clone https://github.com/Fizza-Mukhtar/agentEval
 cd agenteval
 pip install -r requirements-dev.txt
 cd backend && pytest ../tests/ -v
@@ -203,7 +210,11 @@ MIT © 2026 AgentEval Contributors
 ---
 
 <p align="center">
+<<<<<<< HEAD
   <strong>AgentEval</strong>
+=======
+  <strong>AgentEval</strong> 
+>>>>>>> 19f6934 (feat: MVP complete — worker fix, dashboard working end-to-end, README updated)
   <br/>
   <em>Built by developers who got tired of agents silently failing in production.</em>
 </p>

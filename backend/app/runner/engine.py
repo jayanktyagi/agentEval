@@ -37,11 +37,11 @@ The agent contract (what we expect from the agent's HTTP endpoint) is simple:
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 import httpx
 
-from app.core.config import settings
+
 from app.core.store import store
 from app.runner.generator import generate_scenarios
 from app.models import (
@@ -171,7 +171,7 @@ def parse_trace(raw: dict, task: str) -> ExecutionTrace:
         loop_detected=loop_detected,
         loop_at_step=loop_at_step,
         final_output=raw.get("final_output"),
-        finished_at=datetime.utcnow(),
+        finished_at=datetime.now(timezone.utc),
     )
 
 
@@ -182,7 +182,7 @@ def empty_trace(task: str) -> ExecutionTrace:
         tool_calls=[],
         total_steps=0,
         completed=False,
-        finished_at=datetime.utcnow(),
+        finished_at=datetime.now(timezone.utc),
     )
 
 
@@ -294,16 +294,17 @@ def evaluate(scenario: TestScenario, trace: ExecutionTrace) -> ScenarioResult:
 # Main entry point
 # ---------------------------------------------------------------------------
 
-async def run_test(run: TestRun) -> None:
+async def run_test(run: TestRun, session_factory=None) -> None:
     """
     Execute all scenarios for a TestRun.
 
-    Called as a FastAPI background task from POST /runs.
-    Saves to both in-memory store (for fast reads during the run)
-    and Postgres (for persistence across restarts).
+    session_factory: optional — worker passes its own factory bound to
+    the correct event loop. API uses the global SessionLocal.
     """
     from app.db.database import SessionLocal
     from app.db.repository import save_run, save_result
+
+    factory = session_factory or SessionLocal
 
     logger.info("Starting test run %s for agent: %s", run.run_id, run.test.agent_endpoint)
 
@@ -315,8 +316,7 @@ async def run_test(run: TestRun) -> None:
     run.scenarios = scenarios
     results = []
 
-    async with SessionLocal() as session:
-        # Save the run immediately so it appears in the DB as "running"
+    async with factory() as session:
         await save_run(session, run)
 
         for scenario in scenarios:
@@ -332,20 +332,16 @@ async def run_test(run: TestRun) -> None:
             result = evaluate(scenario, trace)
             results.append(result)
 
-            # Save result to Postgres
             await save_result(session, run.run_id, result)
 
-            # Update in-memory store so polling GET /runs/{id} sees progress
             run.results = results
             store.save(run)
 
-            # Small delay between scenarios — be polite to the agent under test
             await asyncio.sleep(0.5)
 
         run.results = results
         run.compute_metrics()
 
-        # Final save to both stores
         await save_run(session, run)
         store.save(run)
 

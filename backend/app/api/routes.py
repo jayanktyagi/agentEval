@@ -60,15 +60,8 @@ async def get_single_run(
     session: AsyncSession = Depends(get_session),
 ):
     """
-    Get a single test run by ID.
-
-    Checks memory first (fast, for runs in progress),
-    then falls back to Postgres (for completed runs).
+    Get a single test run by ID — always reads from Postgres.
     """
-    run = store.get(run_id)
-    if run:
-        return run
-
     run = await get_run(session, run_id)
     if not run:
         raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
