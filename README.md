@@ -164,6 +164,71 @@ agenteval/
 
 ---
 
+
+## Connecting Your Real Agent
+
+AgentEval works with **any agent** that has an HTTP endpoint. Your agent just needs to accept a task and return what it did.
+
+### The Contract
+
+AgentEval sends this to your agent:
+
+```json
+POST /run
+{
+  "task": "Book a flight from Karachi to Dubai for next Friday",
+  "context": {}
+}
+```
+
+Your agent must return this:
+
+```json
+{
+  "tool_calls": [
+    {
+      "tool_name": "search_flights",
+      "parameters": {"origin": "KHI", "destination": "DXB"},
+      "response": {"flights": [{"id": "FL001", "price": 150}]},
+      "status": "success",
+      "duration_ms": 120
+    },
+    {
+      "tool_name": "book_ticket",
+      "parameters": {"flight_id": "FL001"},
+      "response": {"booking_id": "BK001", "status": "confirmed"},
+      "status": "success",
+      "duration_ms": 85
+    }
+  ],
+  "completed": true,
+  "final_output": "Flight FL001 booked successfully."
+}
+```
+
+### LangChain Agent
+
+Add a thin FastAPI wrapper around your existing agent:
+
+```bash
+cp examples/langchain_wrapper.py my_agent_wrapper.py
+# Edit my_agent_wrapper.py — replace tool functions with your real tools
+pip install fastapi uvicorn
+python my_agent_wrapper.py
+```
+
+Then point AgentEval at `http://localhost:9000/run`.
+
+### Custom Python Agent
+
+```bash
+cp examples/custom_agent_wrapper.py my_agent_wrapper.py
+# Edit my_agent_wrapper.py — replace run_agent() with your logic
+python my_agent_wrapper.py
+```
+
+See the `examples/` folder for complete templates.
+
 ## Running Tests
 
 ```bash
@@ -212,7 +277,6 @@ MIT © 2026 AgentEval Contributors
 ---
 
 <p align="center">
-  <strong>AgentEval</strong> 
-  <br/>
+  <strong>AgentEval</strong>
   <em>Built by developers who got tired of agents silently failing in production.</em>
 </p>
