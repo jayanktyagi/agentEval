@@ -2,14 +2,11 @@
 examples/langchain_wrapper.py
 
 Thin FastAPI wrapper to connect a LangChain agent to AgentEval.
-
-AgentEval sends tasks to your agent via HTTP POST.
-This wrapper receives those requests and translates them
-into LangChain agent calls, then returns the execution
-trace in the format AgentEval expects.
+Uses LangGraph (LangChain v1.0+) -- AgentExecutor was removed in v1.0.
 
 Usage:
-    pip install fastapi uvicorn langchain langchain-openai
+    pip install fastapi uvicorn langgraph langchain-openai
+    export OPENAI_API_KEY=your_key_here
     python examples/langchain_wrapper.py
 
 Then point AgentEval at: http://localhost:9000/run
@@ -18,13 +15,12 @@ Then point AgentEval at: http://localhost:9000/run
 import time
 from fastapi import FastAPI
 from pydantic import BaseModel
-from langchain.agents import AgentExecutor, create_openai_tools_agent
 from langchain_openai import ChatOpenAI
 from langchain_core.tools import tool
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langgraph.prebuilt import create_react_agent
 import uvicorn
 
-app = FastAPI(title="My LangChain Agent — AgentEval Wrapper")
+app = FastAPI(title="My LangChain Agent -- AgentEval Wrapper")
 
 
 # ---------------------------------------------------------------------------
@@ -34,40 +30,28 @@ app = FastAPI(title="My LangChain Agent — AgentEval Wrapper")
 @tool
 def search_flights(origin: str, destination: str, date: str = "") -> dict:
     """Search for available flights between two cities."""
-    # Replace with your real implementation
     return {"flights": [{"id": "FL001", "price": 150, "airline": "PIA"}]}
 
 
 @tool
 def check_availability(flight_id: str) -> dict:
     """Check seat availability for a specific flight."""
-    # Replace with your real implementation
     return {"available": True, "seats": 10}
 
 
 @tool
 def book_ticket(flight_id: str, passenger_name: str) -> dict:
     """Book a ticket for a flight."""
-    # Replace with your real implementation
     return {"booking_id": "BK001", "status": "confirmed"}
 
 
 # ---------------------------------------------------------------------------
-# Build the LangChain agent
+# Build the LangGraph agent
 # ---------------------------------------------------------------------------
 
 tools = [search_flights, check_availability, book_ticket]
-
 llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-
-prompt = ChatPromptTemplate.from_messages([
-    ("system", "You are a helpful flight booking assistant. Use the available tools to complete booking tasks."),
-    ("human", "{input}"),
-    MessagesPlaceholder(variable_name="agent_scratchpad"),
-])
-
-agent = create_openai_tools_agent(llm, tools, prompt)
-agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True, return_intermediate_steps=True)
+agent = create_react_agent(llm, tools)
 
 
 # ---------------------------------------------------------------------------
@@ -82,29 +66,35 @@ class AgentRequest(BaseModel):
 @app.post("/run")
 async def run(request: AgentRequest) -> dict:
     """
-    Receives a task from AgentEval, runs the LangChain agent,
+    Receives a task from AgentEval, runs the LangGraph agent,
     and returns the execution trace in AgentEval format.
     """
     tool_calls = []
 
     try:
-        result = agent_executor.invoke({"input": request.task})
+        result = agent.invoke({"messages": [("user", request.task)]})
 
-        # Parse intermediate steps into AgentEval tool call format
-        for i, (action, observation) in enumerate(result.get("intermediate_steps", []), start=1):
-            start = time.time()
-            tool_calls.append({
-                "tool_name": action.tool,
-                "parameters": action.tool_input if isinstance(action.tool_input, dict) else {"input": action.tool_input},
-                "response": observation,
-                "status": "success",
-                "duration_ms": int((time.time() - start) * 1000),
-            })
+        for message in result.get("messages", []):
+            if hasattr(message, "tool_calls") and message.tool_calls:
+                for tc in message.tool_calls:
+                    tool_calls.append({
+                        "tool_name": tc.get("name", "unknown"),
+                        "parameters": tc.get("args", {}),
+                        "response": {},
+                        "status": "success",
+                        "duration_ms": 0,
+                    })
+
+        final_output = ""
+        if result.get("messages"):
+            last = result["messages"][-1]
+            if hasattr(last, "content"):
+                final_output = last.content
 
         return {
             "tool_calls": tool_calls,
             "completed": True,
-            "final_output": result.get("output", ""),
+            "final_output": final_output,
         }
 
     except Exception as exc:
